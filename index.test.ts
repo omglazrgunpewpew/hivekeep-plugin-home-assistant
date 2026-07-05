@@ -447,8 +447,13 @@ describe('home-automation plugin', () => {
     it('parses template response into areas', async () => {
       globalThis.fetch = mock(async (_url: string, init?: RequestInit) => {
         if (init?.method === 'POST') {
-          // HA template API returns the rendered string as JSON
-          return new Response(JSON.stringify('Kitchen|kitchen\nBedroom|bedroom\nGarage|garage'), { status: 200 })
+          // HA's /api/template renders a Jinja template and returns the result
+          // as raw text/plain, not JSON. Calling res.json() on this body throws,
+          // which is the regression this test guards against.
+          return new Response('Kitchen|kitchen\nBedroom|bedroom\nGarage|garage', {
+            status: 200,
+            headers: { 'content-type': 'text/plain; charset=utf-8' },
+          })
         }
         return new Response('{}', { status: 200 })
       }) as any
