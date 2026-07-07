@@ -40,7 +40,16 @@ function buildHaFetch(httpFetch: PluginContext['http']['fetch']) {
       const text = await res.text().catch(() => res.statusText)
       throw new Error(`Home Assistant API error ${res.status}: ${text}`)
     }
-    return res.json()
+    // Not every HA endpoint returns JSON: /api/template renders a Jinja
+    // template and responds with text/plain. Parse as JSON when the body is
+    // JSON, otherwise return the raw string, so text responses (e.g. the
+    // template used by list_areas) don't throw in JSON.parse.
+    const text = await res.text()
+    try {
+      return JSON.parse(text)
+    } catch {
+      return text
+    }
   }
 }
 
@@ -274,8 +283,9 @@ export default function (ctx: PluginContext<HomeAutomationConfig>) {
                     return { id: id?.trim(), name: name?.trim() }
                   })
                 return { count: areas.length, areas }
-              } catch {
-                return { error: 'Could not fetch areas. The template API may not be available.' }
+              } catch (err) {
+                const detail = err instanceof Error ? err.message : String(err)
+                return { error: `Could not fetch areas: ${detail}` }
               }
             },
           }),
